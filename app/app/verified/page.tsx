@@ -20,6 +20,7 @@ export default function VerifiedPage() {
 		nationality: string;
 		gender: string;
 	} | null>(null);
+	const [stravaAthlete, setStravaAthlete] = useState<any | null>(null);
 
 	// Get wallet address from Privy
 	const walletAddress = user?.wallet?.address;
@@ -50,6 +51,12 @@ export default function VerifiedPage() {
 			}
 		}
 		fetchContractData();
+
+		// Load Strava athlete from localStorage
+		if (typeof window !== 'undefined') {
+			const athlete = localStorage.getItem("stravaAthlete");
+			if (athlete) setStravaAthlete(JSON.parse(athlete));
+		}
 	}, [ready, authenticated, walletAddress]);
 
 	const formatAddress = (address: string) => {
@@ -97,6 +104,29 @@ export default function VerifiedPage() {
 
 	return (
 		<div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 overflow-hidden p-4">
+			{/* Strava Trading Card */}
+			{stravaAthlete && (
+				<div className="bg-orange-50 border border-orange-200 rounded-xl shadow-md p-6 mb-8 flex flex-col items-center max-w-md w-full">
+					<img
+						src={stravaAthlete.profile}
+						alt="Strava profile"
+						className="rounded-full border-4 border-orange-300 mb-4"
+						width={120}
+						height={120}
+					/>
+					<h2 className="text-2xl font-bold text-orange-700 mb-1">{stravaAthlete.firstname} {stravaAthlete.lastname}</h2>
+					<p className="text-orange-600 mb-2">@{stravaAthlete.username}</p>
+					<p className="text-gray-700 mb-1">{stravaAthlete.city}{stravaAthlete.state ? `, ${stravaAthlete.state}` : ""}</p>
+					<a
+						href={`https://www.strava.com/athletes/${stravaAthlete.id}`}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="text-orange-500 underline text-sm mt-2"
+					>
+						View Strava Profile
+					</a>
+				</div>
+			)}
 			<div className="bg-white rounded-xl shadow-lg p-8 max-w-2xl w-full">
 				<div className="text-center mb-8">
 					<h1 className={styles.rotatingTitle}>Identity Verified!</h1>
@@ -152,6 +182,15 @@ export default function VerifiedPage() {
 							className="flex-1 bg-blue-600 hover:bg-blue-500 transition-colors text-white py-3 px-6 rounded-lg font-medium"
 						>
 							View Contract
+						</button>
+					</div>
+					{/* Strava Connect Button */}
+					<div className="flex flex-col gap-4 pt-4">
+						<button
+							onClick={() => window.location.href = '/api/strava/login'}
+							className="bg-orange-500 hover:bg-orange-400 transition-colors text-white py-3 px-6 rounded-lg font-medium w-full"
+						>
+							🏃‍♂️ Connect Strava
 						</button>
 					</div>
 				</div>
