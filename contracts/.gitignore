@@ -13,3 +13,4 @@ ignition/deployments/
 
 # Logs
 *.log
+package-lock.json
