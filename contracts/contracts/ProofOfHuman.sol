@@ -21,15 +21,6 @@ contract ProofOfHuman is SelfVerificationRoot {
     SelfStructs.VerificationConfigV2 public verificationConfig;
     bytes32 public verificationConfigId;
     
-    // --- New: Store latest verified user's info ---
-    address public lastVerifiedUser;
-    string public lastVerifiedName;
-    string public lastVerifiedNationality;
-    string public lastVerifiedDateOfBirth;
-    string public lastVerifiedGender;
-    uint256 public lastVerifiedAge;
-    // --- End new additions ---
-
     // Events for testing
     event PersonalDataStored(
         uint256 indexed userIdentifier,
@@ -69,16 +60,6 @@ contract ProofOfHuman is SelfVerificationRoot {
         nationalities[userId] = output.nationality;
         datesOfBirth[userId] = output.dateOfBirth;
         genders[userId] = output.gender;
-
-        // --- New: Update latest verified user's info ---
-        lastVerifiedUser = msg.sender; // or set to another address if needed
-        lastVerifiedName = names[userId];
-        lastVerifiedNationality = nationalities[userId];
-        lastVerifiedDateOfBirth = datesOfBirth[userId];
-        lastVerifiedGender = genders[userId];
-        // If output.age exists, set it; otherwise, set to 0
-        lastVerifiedAge = output.age;
-        // --- End new additions ---
 
         emit PersonalDataStored(
             userId,
