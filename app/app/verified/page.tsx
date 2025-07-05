@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { usePrivy } from "@privy-io/react-auth";
 import { ethers } from "ethers";
 // @ts-ignore
 import abi from "../abi/ProofOfHuman.abi.json";
@@ -9,6 +10,7 @@ import styles from "./page.module.css";
 import skeleton from "./skeleton.gif";
 
 export default function VerifiedPage() {
+	const { ready, authenticated, user } = usePrivy();
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [userData, setUserData] = useState<{
@@ -19,7 +21,11 @@ export default function VerifiedPage() {
 		gender: string;
 	} | null>(null);
 
+	// Get wallet address from Privy
+	const walletAddress = user?.wallet?.address;
+
 	useEffect(() => {
+		if (!ready || !authenticated || !walletAddress) return;
 		async function fetchContractData() {
 			setLoading(true);
 			setError(null);
@@ -30,8 +36,8 @@ export default function VerifiedPage() {
 					abi,
 					provider
 				);
-				// Hardcoded user identifier (address as uint256)
-				const userIdentifier = "0x0000000000000000000000000000000000000000";
+				// Use wallet address as userIdentifier
+				const userIdentifier = walletAddress || "";
 				const name = await contract.names(userIdentifier);
 				const dateOfBirth = await contract.datesOfBirth(userIdentifier);
 				const nationality = await contract.nationalities(userIdentifier);
@@ -44,7 +50,7 @@ export default function VerifiedPage() {
 			}
 		}
 		fetchContractData();
-	}, []);
+	}, [ready, authenticated, walletAddress]);
 
 	const formatAddress = (address: string) => {
 		if (!address) return 'N/A';
@@ -76,53 +82,17 @@ export default function VerifiedPage() {
 		return age.toString();
 	};
 
+	if (!ready || !authenticated || !walletAddress) {
+		return <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">Loading...</div>;
+	}
 	if (loading) {
-		return (
-			<div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 overflow-hidden p-4">
-				<div className="bg-white rounded-xl shadow-lg p-8 max-w-2xl w-full text-center">
-					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-					<p className="text-gray-600">Loading verification data...</p>
-				</div>
-			</div>
-		);
+		return <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">Loading verification data...</div>;
 	}
-
 	if (error) {
-		return (
-			<div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 overflow-hidden p-4">
-				<div className="bg-white rounded-xl shadow-lg p-8 max-w-2xl w-full">
-					<div className="text-center mb-8">
-						<h1 className="text-2xl font-bold text-red-600 mb-4">❌ Error</h1>
-						<p className="text-gray-600">{error}</p>
-					</div>
-					<button
-						onClick={() => window.location.href = '/'}
-						className="w-full bg-gray-800 hover:bg-gray-700 transition-colors text-white py-3 px-6 rounded-lg font-medium"
-					>
-						Go Back Home
-					</button>
-				</div>
-			</div>
-		);
+		return <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4 text-red-600">{error}</div>;
 	}
-
 	if (!userData) {
-		return (
-			<div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 overflow-hidden p-4">
-				<div className="bg-white rounded-xl shadow-lg p-8 max-w-2xl w-full">
-					<div className="text-center mb-8">
-						<h1 className="text-2xl font-bold text-red-600 mb-4">❌ Error</h1>
-						<p className="text-gray-600">No verification data found.</p>
-					</div>
-					<button
-						onClick={() => window.location.href = '/'}
-						className="w-full bg-gray-800 hover:bg-gray-700 transition-colors text-white py-3 px-6 rounded-lg font-medium"
-					>
-						Go Back Home
-					</button>
-				</div>
-			</div>
-		);
+		return <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">No verification data found.</div>;
 	}
 
 	return (
