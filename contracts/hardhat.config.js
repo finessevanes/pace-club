@@ -17,6 +17,11 @@ module.exports = {
       url: "https://alfajores-forno.celo-testnet.org",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 44787
+    },
+    flowTestnet: {
+      url: "https://testnet.evm.nodes.onflow.org",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 545
     }
   },
   etherscan: {
@@ -28,6 +33,14 @@ module.exports = {
         urls: {
           apiURL: "https://api-alfajores.celoscan.io/api",
           browserURL: "https://alfajores.celoscan.io"
+        }
+      },
+      {
+        network: "flowTestnet",
+        chainId: 545,
+        urls: {
+          apiURL: "https://evm-testnet.flowscan.org/api",
+          browserURL: "https://evm-testnet.flowscan.org"
         }
       }
     ]
