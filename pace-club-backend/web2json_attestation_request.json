@@ -1,0 +1,13 @@
+{
+    "attestationType": "0x576562324a736f6e000000000000000000000000000000000000000000000000", 
+    "sourceId": "0x5765423200000000000000000000000000000000000000000000000000000000", 
+    "requestBody": {
+      "url": "https://curly-cooks-smoke.loca.lt/api/user-stats/82406039",
+      "httpMethod": "GET",
+      "headers": "{}",
+      "queryParams": "{}",
+      "body": "{}",
+      "postProcessJq": "{longestRun, longestStreak, mostRunsInMonth}",
+      "abiSignature": "tuple(uint256 longestRun, uint256 longestStreak, uint256 mostRunsInMonth)"
+    }
+  }
