@@ -19,6 +19,7 @@ export default function VerifyPage() {
   const [linkCopied, setLinkCopied] = useState(false);
   const [stravaAthlete, setStravaAthlete] = useState<any | null>(null);
   const [showGenderVerify, setShowGenderVerify] = useState(false);
+  const [showMaleModal, setShowMaleModal] = useState(false);
 
   // Get wallet address from Privy user
   const walletAddress = user?.wallet?.address || "";
@@ -36,8 +37,14 @@ export default function VerifyPage() {
       // Assume gender is stored in localStorage as verified_<walletAddress>_gender
       const g = localStorage.getItem(`verified_${walletAddress}_gender`);
       setGender(g);
+      if (g && ["male", "m"].includes(g.toLowerCase())) {
+        setShowMaleModal(true);
+      } else {
+        setShowMaleModal(false);
+      }
     } else {
       setGender(null);
+      setShowMaleModal(false);
     }
   }, [walletAddress]);
 
@@ -149,6 +156,15 @@ export default function VerifyPage() {
     }
   };
 
+  // Show male modal if gender is male (case-insensitive)
+  useEffect(() => {
+    if (gender && ["male", "m"].includes(gender.toLowerCase())) {
+      setShowMaleModal(true);
+    } else {
+      setShowMaleModal(false);
+    }
+  }, [gender]);
+
   if (!ready) {
     return <LoadingRunner message="Preparing verification..." />;
   }
@@ -156,132 +172,159 @@ export default function VerifyPage() {
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#191919] py-12 px-2">
       <div className="w-full max-w-md mx-auto flex flex-col items-center">
-        {/* Neon icon */}
-        <div className="bg-[#e6ff2f] rounded-xl p-4 mb-6 flex items-center justify-center">
-          <svg width="40" height="40" fill="none" viewBox="0 0 24 24"><rect width="40" height="40" rx="10" fill="#e6ff2f"/><path d="M8 12.5l3 3 5-5" stroke="#191919" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><rect x="4" y="4" width="16" height="16" rx="8" stroke="#191919" strokeWidth="2"/></svg>
-        </div>
-        <h1 className="text-2xl md:text-3xl font-bold text-white text-center mb-2">Verify Your Gender</h1>
-        <p className="text-center text-gray-400 mb-8 text-base md:text-lg">Zero Knowledge Verification Keeps Your Data Private.</p>
-        {/* Status Card */}
-        <div className="w-full bg-[#2b292a] rounded-2xl p-8 flex flex-col gap-6 items-center mb-8">
-          <div className="text-white text-lg font-semibold mb-2">Verification Status</div>
-          <div className="flex flex-col gap-4 w-full">
-            <div
-              className={`flex items-center gap-3 rounded-lg transition cursor-${!gender ? 'pointer' : 'default'} ${!gender ? 'hover:bg-[#232323]' : ''} p-2`}
-              onClick={() => { if (!gender) setShowGenderVerify(true); }}
-              style={{ userSelect: 'none' }}
-            >
-              <span className="text-2xl text-gray-400">
-                {gender ? (
-                  <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#22c55e"/><path d="M8 12.5l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                ) : (
-                  <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2" stroke="#aaa" strokeWidth="2"/><path d="M7 7V5a5 5 0 0110 0v2" stroke="#aaa" strokeWidth="2"/></svg>
-                )}
-              </span>
-              <div>
-                <div className="text-white font-bold flex items-center gap-2">
-                  Gender
-                  {!gender && <span className="text-xs bg-[#e6ff2f] text-black rounded px-2 py-0.5 ml-2">Click to verify</span>}
-                </div>
-                <div className="text-gray-400 text-sm">
-                  {gender ? (
-                    <span className="text-green-400 font-semibold">{gender}</span>
-                  ) : (
-                    "Verify gender identity."
-                  )}
-                </div>
-              </div>
-            </div>
-            <div
-              className={`flex items-center gap-3 rounded-lg transition cursor-${gender && !stravaAthlete ? 'pointer' : 'default'} ${gender && !stravaAthlete ? 'hover:bg-[#232323]' : ''} p-2`}
-              onClick={() => { if (gender && !stravaAthlete) handleConnectStrava(); }}
-              style={{ userSelect: 'none' }}
-            >
-              <span className="text-2xl text-gray-400">
-                {stravaAthlete ? (
-                  <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#22c55e"/><path d="M8 12.5l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                ) : (
-                  <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2" stroke="#aaa" strokeWidth="2"/></svg>
-                )}
-              </span>
-              <div>
-                <div className="text-white font-bold flex items-center gap-2">
-                  Strava
-                  {gender && !stravaAthlete && <span className="text-xs bg-orange-500 text-white rounded px-2 py-0.5 ml-2">Click to connect</span>}
-                </div>
-                <div className="text-gray-400 text-sm">
-                  {stravaAthlete ? (
-                    <span className="text-green-400 font-semibold">{stravaAthlete.firstname} {stravaAthlete.lastname}</span>
-                  ) : (
-                    "Connect your Strava account."
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 mt-4">
-            <span className="text-2xl text-gray-400"><svg width="24" height="24" fill="none" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2" stroke="#aaa" strokeWidth="2"/></svg></span>
-            <span className="text-gray-300">{gender && stravaAthlete ? "2/2 Verified" : gender ? "1/2 Verified" : "0/2 Verified"}</span>
-          </div>
-        </div>
-        {/* Modal for Gender Verification */}
-        {!gender && showGenderVerify && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
+        {/* Male Modal - blocks access if user is male */}
+        {showMaleModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80">
             <div className="bg-[#232323] rounded-2xl p-8 shadow-xl flex flex-col items-center relative w-full max-w-md mx-auto animate-fade-in">
-              <button
-                className="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl font-bold"
-                onClick={() => setShowGenderVerify(false)}
-                aria-label="Close"
-              >
-                ×
-              </button>
-              <div className="mb-4 text-gray-300 text-center text-lg font-semibold">Verify with Self Protocol</div>
-              <div className="flex flex-col items-center gap-2 mb-4">
-                {selfApp ? (
-                  <SelfQRcodeWrapper
-                    selfApp={selfApp}
-                    // @ts-ignore
-                    onSuccess={() => {
-                      fetchVerificationData();
-                      setShowGenderVerify(false);
-                    }}
-                    onError={(error) => {
-                      console.error("Verification error:", error);
-                    }}
-                  />
-                ) : (
-                  <div className="w-[256px] h-[256px] bg-gray-700 animate-pulse flex items-center justify-center rounded-xl">
-                    <p className="text-gray-400 text-sm">Loading QR Code...</p>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={copyToClipboard}
-                  disabled={!universalLink}
-                  className="bg-gray-800 hover:bg-gray-700 transition-colors text-white p-2 rounded-md text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
-                >
-                  {linkCopied ? "Copied!" : "Copy Universal Link"}
-                </button>
-                <button
-                  type="button"
-                  onClick={openSelfApp}
-                  disabled={!universalLink}
-                  className="bg-[#e6ff2f] hover:bg-[#d4ff3f] text-black font-bold p-2 rounded-md text-sm disabled:bg-gray-400 disabled:text-gray-700"
-                >
-                  Open in Self App
-                </button>
+              <div className="mb-4 text-pink-400 text-center text-2xl font-bold">Women Only Club</div>
+              <div className="text-gray-200 text-center text-lg mb-6">
+                Hey, so cool you wanna join this, but it's actually a women only club.<br/><br/>
+                But if you have a sister, mom or s/o you shoudl tell them about this app.
               </div>
+              <button
+                className="mt-4 bg-[#e6ff2f] hover:bg-[#d4ff3f] text-black font-bold py-2 px-6 rounded-lg text-lg shadow"
+                onClick={() => {
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  window.location.href = "/";
+                }}
+              >
+                Close
+              </button>
             </div>
-            {/* Overlay click closes modal */}
-            <div className="fixed inset-0 z-40" onClick={() => setShowGenderVerify(false)} />
           </div>
         )}
-        {/* All set message */}
-        {gender && stravaAthlete && (
-          <div className="w-full flex flex-col items-center mt-8">
-            <div className="text-green-400 text-lg font-bold mb-2">You're all set!</div>
-            <div className="text-gray-400 text-sm">Redirecting to your profile...</div>
-          </div>
+        {/* Only show the rest of the UI if not blocked by male modal */}
+        {!showMaleModal && (
+          <>
+            {/* Neon icon */}
+            <div className="bg-[#e6ff2f] rounded-xl p-4 mb-6 flex items-center justify-center">
+              <svg width="40" height="40" fill="none" viewBox="0 0 24 24"><rect width="40" height="40" rx="10" fill="#e6ff2f"/><path d="M8 12.5l3 3 5-5" stroke="#191919" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><rect x="4" y="4" width="16" height="16" rx="8" stroke="#191919" strokeWidth="2"/></svg>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold text-white text-center mb-2">Verify Your Gender</h1>
+            <p className="text-center text-gray-400 mb-8 text-base md:text-lg">Zero Knowledge Verification Keeps Your Data Private.</p>
+            {/* Status Card */}
+            <div className="w-full bg-[#2b292a] rounded-2xl p-8 flex flex-col gap-6 items-center mb-8">
+              <div className="text-white text-lg font-semibold mb-2">Verification Status</div>
+              <div className="flex flex-col gap-4 w-full">
+                <div
+                  className={`flex items-center gap-3 rounded-lg transition cursor-${!gender ? 'pointer' : 'default'} ${!gender ? 'hover:bg-[#232323]' : ''} p-2`}
+                  onClick={() => { if (!gender) setShowGenderVerify(true); }}
+                  style={{ userSelect: 'none' }}
+                >
+                  <span className="text-2xl text-gray-400">
+                    {gender ? (
+                      <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#22c55e"/><path d="M8 12.5l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    ) : (
+                      <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2" stroke="#aaa" strokeWidth="2"/><path d="M7 7V5a5 5 0 0110 0v2" stroke="#aaa" strokeWidth="2"/></svg>
+                    )}
+                  </span>
+                  <div>
+                    <div className="text-white font-bold flex items-center gap-2">
+                      Gender
+                      {!gender && <span className="text-xs bg-[#e6ff2f] text-black rounded px-2 py-0.5 ml-2">Click to verify</span>}
+                    </div>
+                    <div className="text-gray-400 text-sm">
+                      {gender ? (
+                        <span className="text-green-400 font-semibold">{gender}</span>
+                      ) : (
+                        "Verify gender identity."
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className={`flex items-center gap-3 rounded-lg transition cursor-${gender && !stravaAthlete ? 'pointer' : 'default'} ${gender && !stravaAthlete ? 'hover:bg-[#232323]' : ''} p-2`}
+                  onClick={() => { if (gender && !stravaAthlete) handleConnectStrava(); }}
+                  style={{ userSelect: 'none' }}
+                >
+                  <span className="text-2xl text-gray-400">
+                    {stravaAthlete ? (
+                      <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#22c55e"/><path d="M8 12.5l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    ) : (
+                      <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2" stroke="#aaa" strokeWidth="2"/></svg>
+                    )}
+                  </span>
+                  <div>
+                    <div className="text-white font-bold flex items-center gap-2">
+                      Strava
+                      {gender && !stravaAthlete && <span className="text-xs bg-orange-500 text-white rounded px-2 py-0.5 ml-2">Click to connect</span>}
+                    </div>
+                    <div className="text-gray-400 text-sm">
+                      {stravaAthlete ? (
+                        <span className="text-green-400 font-semibold">{stravaAthlete.firstname} {stravaAthlete.lastname}</span>
+                      ) : (
+                        "Connect your Strava account."
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 mt-4">
+                <span className="text-2xl text-gray-400"><svg width="24" height="24" fill="none" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2" stroke="#aaa" strokeWidth="2"/></svg></span>
+                <span className="text-gray-300">{gender && stravaAthlete ? "2/2 Verified" : gender ? "1/2 Verified" : "0/2 Verified"}</span>
+              </div>
+            </div>
+            {/* Modal for Gender Verification */}
+            {!gender && showGenderVerify && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70">
+                <div className="bg-[#232323] rounded-2xl p-8 shadow-xl flex flex-col items-center relative w-full max-w-md mx-auto animate-fade-in">
+                  <button
+                    className="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl font-bold"
+                    onClick={() => setShowGenderVerify(false)}
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                  <div className="mb-4 text-gray-300 text-center text-lg font-semibold">Verify with Self Protocol</div>
+                  <div className="flex flex-col items-center gap-2 mb-4">
+                    {selfApp ? (
+                      <SelfQRcodeWrapper
+                        selfApp={selfApp}
+                        // @ts-ignore
+                        onSuccess={() => {
+                          fetchVerificationData();
+                          setShowGenderVerify(false);
+                        }}
+                        onError={(error) => {
+                          console.error("Verification error:", error);
+                        }}
+                      />
+                    ) : (
+                      <div className="w-[256px] h-[256px] bg-gray-700 animate-pulse flex items-center justify-center rounded-xl">
+                        <p className="text-gray-400 text-sm">Loading QR Code...</p>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={copyToClipboard}
+                      disabled={!universalLink}
+                      className="bg-gray-800 hover:bg-gray-700 transition-colors text-white p-2 rounded-md text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                      {linkCopied ? "Copied!" : "Copy Universal Link"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openSelfApp}
+                      disabled={!universalLink}
+                      className="bg-[#e6ff2f] hover:bg-[#d4ff3f] text-black font-bold p-2 rounded-md text-sm disabled:bg-gray-400 disabled:text-gray-700"
+                    >
+                      Open in Self App
+                    </button>
+                  </div>
+                </div>
+                {/* Overlay click closes modal */}
+                <div className="fixed inset-0 z-40" onClick={() => setShowGenderVerify(false)} />
+              </div>
+            )}
+            {/* All set message */}
+            {gender && stravaAthlete && (
+              <div className="w-full flex flex-col items-center mt-8">
+                <div className="text-green-400 text-lg font-bold mb-2">You're all set!</div>
+                <div className="text-gray-400 text-sm">Redirecting to your profile...</div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
