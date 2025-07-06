@@ -32,11 +32,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       config={{
         // Remove embedded wallets - use external wallets only
         embeddedWallets: {
-          createOnLogin: "off", // Disable embedded wallet creation
-        },
-        loginMethods: ["wallet", "email", "sms"], // Keep wallet as primary login method
-        appearance: {
-          showWalletLoginFirst: true, // Show wallet connection first
+          createOnLogin: "users-without-wallets", // Disable embedded wallet creation
         },
         supportedChains: [flowTestnet],
         // No defaultChain - keeps Privy's defaults for Self verification

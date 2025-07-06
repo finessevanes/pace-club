@@ -122,9 +122,6 @@ export default function CreateVibeProfilePage() {
           data: encodedData,
           value: "0x0" // No ETH value needed for this transaction
         },
-        {
-          address: user.wallet.address // Force using the current wallet address
-        }
       );
 
       console.log("Transaction submitted:", txResponse.hash);

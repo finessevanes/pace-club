@@ -409,10 +409,6 @@ export default function ProfilePage() {
                   Running in {cityList.slice(0, 3).join(', ')}{cityList.length > 3 ? ` and ${cityList.length - 3} more` : ''}
                 </p>
               )}
-              
-              <p className={`text-lg text-[${THEME.colors.text.muted}] max-w-md leading-relaxed`}>
-                {athlete?.bio || "Here to meet new run pals"}
-              </p>
             </div>
           </div>
         </Card>
