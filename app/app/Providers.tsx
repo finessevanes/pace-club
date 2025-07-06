@@ -30,10 +30,13 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <PrivyProvider
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
       config={{
+        // Remove embedded wallets - use external wallets only
         embeddedWallets: {
-          ethereum: {
-            createOnLogin: "users-without-wallets",
-          },
+          createOnLogin: "off", // Disable embedded wallet creation
+        },
+        loginMethods: ["wallet", "email", "sms"], // Keep wallet as primary login method
+        appearance: {
+          showWalletLoginFirst: true, // Show wallet connection first
         },
         supportedChains: [flowTestnet],
         // No defaultChain - keeps Privy's defaults for Self verification

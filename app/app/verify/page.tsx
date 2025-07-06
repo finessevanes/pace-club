@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { ethers } from "ethers";
 // @ts-ignore
 import abi from "../abi/ProofOfHuman.abi.json";
+import LoadingRunner from "../components/LoadingRunner";
 
 export default function VerifyPage() {
   const { ready, authenticated, login, user } = usePrivy();
@@ -149,7 +150,7 @@ export default function VerifyPage() {
   };
 
   if (!ready) {
-    return <div className="min-h-screen flex items-center justify-center text-lg">Loading...</div>;
+    return <LoadingRunner message="Preparing verification..." />;
   }
 
   return (

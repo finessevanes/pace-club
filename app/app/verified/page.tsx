@@ -8,6 +8,7 @@ import abi from "../abi/ProofOfHuman.abi.json";
 import Image from "next/image";
 import styles from "./page.module.css";
 import skeleton from "./skeleton.gif";
+import LoadingRunner from "../components/LoadingRunner";
 
 export default function VerifiedPage() {
 	const { ready, authenticated, user } = usePrivy();
@@ -90,10 +91,10 @@ export default function VerifiedPage() {
 	};
 
 	if (!ready || !authenticated || !walletAddress) {
-		return <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">Loading...</div>;
+		return <LoadingRunner message="Checking your credentials..." />;
 	}
 	if (loading) {
-		return <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">Loading verification data...</div>;
+		return <LoadingRunner message="Loading verification data..." />;
 	}
 	if (error) {
 		return <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4 text-red-600">{error}</div>;

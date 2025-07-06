@@ -1,5 +1,11 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { 
+  ProfilePageSkeleton, 
+  StatCardSkeleton,
+  RecentRunsSkeleton,
+} from "../components/SkeletonLoader";
 
 // Types
 interface Athlete {
@@ -89,12 +95,6 @@ const PLACEHOLDER_DATA = {
     { name: "Morgan", avatar: "https://randomuser.me/api/portraits/women/12.jpg" },
   ] as CrewMember[],
   
-  recentRuns: [
-    { distance: 4.2, time: "47:12", pace: "11:13/mi", ago: "2d ago" },
-    { distance: 2.9, time: "31:05", pace: "10:43/mi", ago: "5d ago" },
-    { distance: 5.0, time: "51:30", pace: "10:18/mi", ago: "1w ago" },
-  ] as Run[],
-  
   pointEvents: [
     { points: 5, label: "Met with a new running partner" },
     { points: 2, label: "Logged a run" },
@@ -148,150 +148,174 @@ const roundToNearest15Min = (date: Date): string => {
   return `${hour.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
 };
 
-// Custom hooks
-const useStravaData = () => {
+// New hook: fetches activities once, returns only runs
+const useStravaActivities = () => {
+  const [runs, setRuns] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchActivities = async () => {
+      const accessToken = localStorage.getItem("stravaAccessToken");
+      if (!accessToken) {
+        setIsLoading(false);
+        return;
+      }
+      try {
+        let allActivities: any[] = [];
+        const res = await fetch(`https://www.strava.com/api/v3/athlete/activities?per_page=50`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!res.ok) {
+          setIsLoading(false);
+          return;
+        }
+        const data = await res.json();
+        if (!Array.isArray(data) || data.length === 0) {
+          setIsLoading(false);
+          return;
+        }
+        allActivities = allActivities.concat(data);
+        // Filter for runs only
+        const runsOnly = allActivities.filter((act) => act.type === "Run");
+        setRuns(runsOnly);
+        localStorage.setItem("stravaRunsAll", JSON.stringify(runsOnly));
+      } catch (err) {
+        // fallback to localStorage if available
+        const cached = localStorage.getItem("stravaRunsAll");
+        if (cached) setRuns(JSON.parse(cached));
+        console.error("Error fetching Strava activities:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchActivities();
+  }, []);
+
+  return { runs, isLoading };
+};
+
+// Refactored: accepts runs as argument
+const useStravaData = (runs: any[]) => {
   const [athlete, setAthlete] = useState<Athlete | null>(null);
   const [recentRuns, setRecentRuns] = useState<Run[]>([]);
 
   useEffect(() => {
     const stravaAthlete = localStorage.getItem("stravaAthlete");
     if (stravaAthlete) setAthlete(JSON.parse(stravaAthlete));
-    const stravaRuns = localStorage.getItem("stravaRuns");
-    if (stravaRuns) setRecentRuns(JSON.parse(stravaRuns));
-  }, []);
+    // Helper to format seconds to mm:ss
+    const formatTime = (seconds: number) => {
+      const min = Math.floor(seconds / 60);
+      const sec = Math.round(seconds % 60).toString().padStart(2, "0");
+      return `${min}:${sec}`;
+    };
+    const getAgo = (dateString: string) => {
+      const now = new Date();
+      const date = new Date(dateString);
+      const diffMs = now.getTime() - date.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) return "Today";
+      if (diffDays === 1) return "1d ago";
+      if (diffDays < 7) return `${diffDays}d ago`;
+      const diffWeeks = Math.floor(diffDays / 7);
+      return `${diffWeeks}w ago`;
+    };
+    // Process runs for recent runs
+    const recent = runs
+      .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
+      .slice(0, 3)
+      .map((act) => {
+        const miles = act.distance / 1609.34;
+        const time = formatTime(act.moving_time);
+        const paceSec = act.moving_time / miles;
+        const pace = isFinite(paceSec) ? formatTime(paceSec) + "/mi" : "-";
+        const ago = getAgo(act.start_date_local);
+        return {
+          distance: Number(miles.toFixed(1)),
+          time,
+          pace,
+          ago,
+        };
+      });
+    setRecentRuns(recent);
+    localStorage.setItem("stravaRuns", JSON.stringify(recent));
+  }, [runs]);
 
   return { athlete, recentRuns };
 };
 
-const useStravaStats = (athlete: Athlete | null) => {
+// Refactored: accepts runs as argument
+const useStravaAnalytics = (athlete: Athlete | null, runs: any[]) => {
   const [stats, setStats] = useState<Stats>(INITIAL_STATS);
-
-  useEffect(() => {
-    const fetchStravaStats = async () => {
-      const accessToken = localStorage.getItem("stravaAccessToken");
-      if (!accessToken) return;
-      
-      try {
-        const res = await fetch("https://www.strava.com/api/v3/athlete/activities?per_page=100", {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        if (!res.ok) return;
-        
-        const activities = await res.json();
-        if (!Array.isArray(activities) || activities.length === 0) return;
-
-        let totalDistance = 0;
-        let totalRuns = 0;
-        let longestRun = 0;
-        let elevationGain = 0;
-        let totalPaceSeconds = 0;
-        let paceCount = 0;
-        const timeBuckets: Record<string, number> = {};
-
-        activities.forEach((act) => {
-          if (act.type === "Run") {
-            totalRuns++;
-            const miles = act.distance / 1609.34;
-            totalDistance += miles;
-            if (miles > longestRun) longestRun = miles;
-            elevationGain += act.total_elevation_gain || 0;
-            
-            if (act.moving_time && miles > 0) {
-              totalPaceSeconds += act.moving_time / miles;
-              paceCount++;
-            }
-            
-            const bucket = roundToNearest15Min(new Date(act.start_date_local));
-            timeBuckets[bucket] = (timeBuckets[bucket] || 0) + 1;
-          }
-        });
-
-        setStats({
-          totalDistance,
-          totalRuns,
-          longestRun,
-          elevationGain: Math.round(elevationGain),
-          pace: formatPace(totalPaceSeconds, paceCount),
-          bestTime: formatBestTime(timeBuckets),
-          metro: athlete?.city || "-",
-        });
-      } catch (err) {
-        console.error("Error fetching Strava stats:", err);
-      }
-    };
-
-    fetchStravaStats();
-  }, [athlete]);
-
-  return stats;
-};
-
-const useBadges = (athlete: Athlete | null, pace: string) => {
   const [badges, setBadges] = useState<Badge[]>([]);
   const [cityList, setCityList] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const computeBadges = async () => {
-      const accessToken = localStorage.getItem("stravaAccessToken");
-      if (!accessToken) {
-        setBadges([]);
-        setCityList([athlete?.city || "Phoenix"]);
-        return;
-      }
-      
-      try {
-        const res = await fetch("https://www.strava.com/api/v3/athlete/activities?per_page=100", {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        if (!res.ok) {
-          setBadges([]);
-          setCityList([athlete?.city || "Phoenix"]);
-          return;
+    if (!runs || runs.length === 0) return;
+    setIsLoading(true);
+    try {
+      // Calculate stats
+      let totalDistance = 0;
+      let totalRuns = 0;
+      let longestRun = 0;
+      let elevationGain = 0;
+      let totalPaceSeconds = 0;
+      let paceCount = 0;
+      const timeBuckets: Record<string, number> = {};
+      // Calculate badges
+      const citySet = new Set<string>();
+      let trailRuns = 0, roadRuns = 0;
+      let longestRunForBadge = 0;
+      runs.forEach((act) => {
+        const miles = act.distance / 1609.34;
+        // Stats calculations
+        totalRuns++;
+        totalDistance += miles;
+        if (miles > longestRun) longestRun = miles;
+        elevationGain += act.total_elevation_gain || 0;
+        if (act.moving_time && miles > 0) {
+          totalPaceSeconds += act.moving_time / miles;
+          paceCount++;
         }
-        
-        const activities = await res.json();
-        if (!Array.isArray(activities) || activities.length === 0) {
-          setBadges([]);
-          setCityList([athlete?.city || "Phoenix"]);
-          return;
-        }
-        
-        const citySet = new Set<string>();
-        let trailRuns = 0, roadRuns = 0;
-        let longestRun = 0;
-        
-        activities.forEach((act) => {
-          if (act.type === "Run") {
-            if (act.location_city) citySet.add(act.location_city);
-            if (act.workout_type === 1 || (act.name && /trail/i.test(act.name))) trailRuns++;
-            else roadRuns++;
-            const miles = act.distance / 1609.34;
-            if (miles > longestRun) longestRun = miles;
-          }
-        });
-        
-        let surface = "";
-        if (trailRuns > roadRuns && trailRuns > 0) surface = "Trail Lover";
-        else if (roadRuns > trailRuns && roadRuns > 0) surface = "Road Warrior";
-        
-        let badgeArr: Badge[] = [];
-        if (surface) badgeArr.push({ label: surface, icon: surface === 'Trail Lover' ? '🌲' : '🛣️' });
-        if (longestRun > 0) badgeArr.push({ label: `Longest Run: ${longestRun.toFixed(1)} mi`, icon: '🏃‍♀️' });
-        if (citySet.size > 1) badgeArr.push({ label: `Cities Run: ${citySet.size}`, icon: '🌎' });
-        if (badgeArr.length < 3 && pace && pace !== '-') badgeArr.push({ label: `Avg Pace: ${pace}`, icon: '⏱️' });
-        
-        setBadges(badgeArr.slice(0, 3));
-        setCityList(Array.from(citySet));
-      } catch {
-        setBadges([]);
-        setCityList([athlete?.city || "Phoenix"]);
-      }
-    };
-    
-    computeBadges();
-  }, [athlete, pace]);
+        const bucket = roundToNearest15Min(new Date(act.start_date_local));
+        timeBuckets[bucket] = (timeBuckets[bucket] || 0) + 1;
+        // Badge calculations
+        if (act.location_city) citySet.add(act.location_city);
+        if (act.workout_type === 1 || (act.name && /trail/i.test(act.name))) trailRuns++;
+        else roadRuns++;
+        if (miles > longestRunForBadge) longestRunForBadge = miles;
+      });
+      // Set stats
+      const calculatedPace = formatPace(totalPaceSeconds, paceCount);
+      setStats({
+        totalDistance,
+        totalRuns,
+        longestRun,
+        elevationGain: Math.round(elevationGain),
+        pace: calculatedPace,
+        bestTime: formatBestTime(timeBuckets),
+        metro: athlete?.city || "-",
+      });
+      // Set badges
+      let surface = "";
+      if (trailRuns > roadRuns && trailRuns > 0) surface = "Trail Lover";
+      else if (roadRuns > trailRuns && roadRuns > 0) surface = "Road Warrior";
+      let badgeArr: Badge[] = [];
+      if (surface) badgeArr.push({ label: surface, icon: surface === 'Trail Lover' ? '🌲' : '🛣️' });
+      if (longestRunForBadge > 0) badgeArr.push({ label: `Longest Run: ${longestRunForBadge.toFixed(1)} mi`, icon: '🏃‍♀️' });
+      if (citySet.size > 1) badgeArr.push({ label: `Cities Run: ${citySet.size}`, icon: '🌎' });
+      if (badgeArr.length < 3 && calculatedPace && calculatedPace !== '-') badgeArr.push({ label: `Avg Pace: ${calculatedPace}`, icon: '⏱️' });
+      setBadges(badgeArr.slice(0, 3));
+      setCityList(Array.from(citySet));
+    } catch (err) {
+      setBadges([]);
+      setCityList([athlete?.city || "Phoenix"]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [runs, athlete]);
 
-  return { badges, cityList };
+  return { stats, badges, cityList, isLoading };
 };
 
 // Components
@@ -331,12 +355,16 @@ const RunIcon: React.FC = () => (
 );
 
 export default function ProfilePage() {
-  const { athlete, recentRuns } = useStravaData();
-  const stats = useStravaStats(athlete);
-  const { badges, cityList } = useBadges(athlete, stats.pace);
+  const router = useRouter();
+  const { runs, isLoading: isLoadingActivities } = useStravaActivities();
+  const { athlete, recentRuns } = useStravaData(runs);
+  const { stats, badges, cityList, isLoading: isLoadingAnalytics } = useStravaAnalytics(athlete, runs);
   const [points] = useState<number>(12);
 
-  const displayRuns = recentRuns.length > 0 ? recentRuns : PLACEHOLDER_DATA.recentRuns;
+  // Show full skeleton while initial data is loading
+  if (isLoadingActivities) {
+    return <ProfilePageSkeleton />;
+  }
 
   return (
     <div className={`min-h-screen bg-[${THEME.colors.background}] py-6 px-4`}>
@@ -389,44 +417,78 @@ export default function ProfilePage() {
           </div>
         </Card>
 
+        {/* Create Vibe Profile Button */}
+        <Card>
+          <CardContent>
+            <div className="text-center">
+              <h3 className={`text-xl font-semibold text-[${THEME.colors.text.primary}] mb-4`}>Ready to Find Your Crew?</h3>
+              <p className={`text-[${THEME.colors.text.secondary}] mb-6`}>Create your vibe profile and get matched with compatible runners on Flow blockchain.</p>
+              <button 
+                onClick={() => router.push("/create-vibe-profile")}
+                className={`inline-flex items-center gap-2 ${THEME.styles.button} text-lg px-8 py-4`}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Create Vibe Profile
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard value={stats.totalDistance.toFixed(0)} label="Miles" />
-          <StatCard value={stats.totalRuns} label="Runs" />
-          <StatCard value={stats.longestRun.toFixed(1)} label="Longest" />
-          <StatCard value={stats.pace} label="Avg Pace" />
+          {isLoadingAnalytics ? (
+            <>
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+            </>
+          ) : (
+            <>
+              <StatCard value={stats.totalDistance.toFixed(0)} label="Miles" />
+              <StatCard value={stats.totalRuns} label="Runs" />
+              <StatCard value={stats.longestRun.toFixed(1)} label="Longest" />
+              <StatCard value={stats.pace} label="Avg Pace" />
+            </>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           {/* Recent Activity */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <h2 className={`text-xl font-semibold text-[${THEME.colors.text.primary}]`}>Recent Runs</h2>
-                <button className={`text-[${THEME.colors.primary}] text-sm font-medium hover:text-[${THEME.colors.primary}]/80 transition-colors`}>
-                  View All
-                </button>
-              </div>
-            </CardHeader>
-            
-            <CardContent>
-              <div className="space-y-4">
-                {displayRuns.slice(0, 3).map((run, i) => (
-                  <div key={i} className={`flex items-center justify-between py-3 border-b border-[${THEME.colors.border}] last:border-0`}>
-                    <div className="flex items-center gap-4">
-                      <RunIcon />
-                      <div>
-                        <div className={`font-semibold text-[${THEME.colors.text.primary}]`}>{run.distance} miles</div>
-                        <div className={`text-sm text-[${THEME.colors.text.secondary}]`}>{run.time} • {run.pace}</div>
+          {recentRuns.length === 0 && !isLoadingActivities ? (
+            <RecentRunsSkeleton />
+          ) : (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <h2 className={`text-xl font-semibold text-[${THEME.colors.text.primary}]`}>Recent Runs</h2>
+                  <button className={`text-[${THEME.colors.primary}] text-sm font-medium hover:text-[${THEME.colors.primary}]/80 transition-colors`}>
+                    View All
+                  </button>
+                </div>
+              </CardHeader>
+              
+              <CardContent>
+                <div className="space-y-4">
+                  {recentRuns.map((run, i) => (
+                    <div key={i} className={`flex items-center justify-between py-3 border-b border-[${THEME.colors.border}] last:border-0`}>
+                      <div className="flex items-center gap-4">
+                        <RunIcon />
+                        <div>
+                          <div className={`font-semibold text-[${THEME.colors.text.primary}]`}>{run.distance} miles</div>
+                          <div className={`text-sm text-[${THEME.colors.text.secondary}]`}>{run.time} • {run.pace}</div>
+                        </div>
                       </div>
+                      <div className={`text-sm text-[${THEME.colors.text.tertiary}]`}>{run.ago}</div>
                     </div>
-                    <div className={`text-sm text-[${THEME.colors.text.tertiary}]`}>{run.ago}</div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Achievements */}
           <Card>

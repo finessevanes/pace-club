@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import LoadingRunner from "../components/LoadingRunner";
 
 export default function StravaRedirectPage() {
   const searchParams = useSearchParams();
@@ -68,10 +69,5 @@ export default function StravaRedirectPage() {
     setStatus("No Strava data found in URL.");
   }, [searchParams, router]);
 
-  return (
-    <div style={{ padding: 32, textAlign: "center" }}>
-      <h2>Strava Connection</h2>
-      <p>{status}</p>
-    </div>
-  );
+  return <LoadingRunner message={status} />;
 } 
