@@ -6,6 +6,8 @@ import {
   StatCardSkeleton,
   RecentRunsSkeleton,
 } from "../components/SkeletonLoader";
+import { ethers } from "ethers";
+import abi from "../abi/VibeProfile.abi.json";
 
 // Types
 interface Athlete {
@@ -110,6 +112,20 @@ const INITIAL_STATS: Stats = {
   bestTime: "-",
   metro: "-",
 };
+
+const paceTypes = [
+  { name: "Chill", icon: "🐢" },
+  { name: "Brisk", icon: "🚶" },
+  { name: "Stride", icon: "🏃" },
+  { name: "Sprint", icon: "💨" }
+];
+
+const vibeTypes = [
+  { name: "Zen", icon: "🧘" },
+  { name: "Energy", icon: "⚡" },
+  { name: "Focus", icon: "🎯" },
+  { name: "Beast", icon: "🔥" }
+];
 
 // Utility functions
 const formatPace = (totalPaceSeconds: number, paceCount: number): string => {
@@ -361,6 +377,34 @@ export default function ProfilePage() {
   const { stats, badges, cityList, isLoading: isLoadingAnalytics } = useStravaAnalytics(athlete, runs);
   const [points] = useState<number>(12);
 
+  // State for on-chain profile
+  const [onChainProfile, setOnChainProfile] = useState<any | null>(null);
+  const [onChainProfileLoading, setOnChainProfileLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchAndSetOnChainProfile() {
+      try {
+        if (typeof window === 'undefined' || !window.ethereum) return;
+        const address = process.env.NEXT_PUBLIC_PRIVY_EMBEDED_ADDRESS;
+        if (!address) return;
+        if (!process.env.NEXT_PUBLIC_FLOW_RPC_URL || !process.env.NEXT_PUBLIC_VIBE_PROFILE_CONTRACT_ADDRESS) return;
+        const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_FLOW_RPC_URL);
+        const contract = new ethers.Contract(
+          process.env.NEXT_PUBLIC_VIBE_PROFILE_CONTRACT_ADDRESS,
+          abi,
+          provider
+        );
+        const prof = await contract.getProfile(address);
+        setOnChainProfile(prof);
+      } catch (err) {
+        setOnChainProfile(null); // No profile or error
+      } finally {
+        setOnChainProfileLoading(false);
+      }
+    }
+    fetchAndSetOnChainProfile();
+  }, []);
+
   // Show full skeleton while initial data is loading
   if (isLoadingActivities) {
     return <ProfilePageSkeleton />;
@@ -371,7 +415,22 @@ export default function ProfilePage() {
       <div className="max-w-4xl mx-auto space-y-8">
         
         {/* Hero Section */}
-        <Card className="rounded-3xl shadow-xl overflow-hidden">
+        <Card className="rounded-3xl shadow-xl overflow-hidden relative">
+          {/* Apple-style Edit/Create button in top-right */}
+          {!onChainProfileLoading && (
+            <button
+              onClick={() => router.push('/create-vibe-profile')}
+              className="absolute top-6 right-6 bg-[#D6FF00] text-[#1A1A1A] rounded-full px-4 py-2 font-semibold text-base shadow hover:bg-[#D6FF00]/90 transition-colors flex items-center gap-2"
+              style={{ zIndex: 10 }}
+              aria-label={onChainProfile ? 'Update Vibe Profile' : 'Create Vibe Profile'}
+            >
+              {/* Pencil/Edit icon */}
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6-6m2 2l-6 6m-2 2h6" />
+              </svg>
+              {onChainProfile ? 'Update' : 'Create'}
+            </button>
+          )}
           <div className="px-8 pt-12 pb-8">
             <div className="flex flex-col items-center text-center">
               <div className={`w-32 h-32 rounded-full overflow-hidden mb-6 shadow-lg ring-4 ring-[${THEME.colors.primary}]`}>
@@ -381,6 +440,31 @@ export default function ProfilePage() {
                   <div className="w-full h-full bg-gradient-to-br from-[#333333] to-[#666666]" />
                 )}
               </div>
+              
+              {onChainProfile && (
+                <div className="bg-gradient-to-br from-[#232323] to-[#191919] border-2 border-[#D6FF00] shadow-2xl rounded-2xl p-6 mb-6 w-full max-w-md mx-auto text-left text-base flex flex-col items-center">
+                  <div className="font-extrabold text-[#D6FF00] text-xl mb-2 tracking-wider">Vibe Profile Card</div>
+                  <div className="flex flex-wrap gap-4 justify-center w-full mb-2">
+                    <div>
+                      <span className="font-semibold">Pace:</span>{" "}
+                      {paceTypes[onChainProfile.pacePreference]?.icon} {paceTypes[onChainProfile.pacePreference]?.name}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Vibe:</span>{" "}
+                      {vibeTypes[onChainProfile.vibeType]?.icon} {vibeTypes[onChainProfile.vibeType]?.name}
+                    </div>
+                    <div><span className="font-semibold">Location:</span> {onChainProfile.location}</div>
+                    <div><span className="font-semibold">Time:</span> {onChainProfile.timeSlot}</div>
+                  </div>
+                  <div className="italic text-[#D6FF00] mb-2">{onChainProfile.bio}</div>
+                  <div className="flex flex-wrap gap-4 justify-center w-full mb-2">
+                    <div><span className="font-semibold">Points:</span> {onChainProfile.points?.toString?.() ?? onChainProfile.points}</div>
+                    <div><span className="font-semibold">Reputation:</span> {onChainProfile.reputation?.toString?.() ?? onChainProfile.reputation}</div>
+                    <div><span className="font-semibold">Active:</span> {onChainProfile.isActive ? "Yes" : "No"}</div>
+                  </div>
+                  <div className="text-xs text-[#999]">Created: {onChainProfile.createdAt?.toString?.() ?? onChainProfile.createdAt}</div>
+                </div>
+              )}
               
               <h1 className={`text-4xl font-bold text-[${THEME.colors.text.primary}] mb-2 tracking-tight`}>
                 {athlete?.firstname || "Gemma"}
@@ -411,25 +495,6 @@ export default function ProfilePage() {
               )}
             </div>
           </div>
-        </Card>
-
-        {/* Create Vibe Profile Button */}
-        <Card>
-          <CardContent>
-            <div className="text-center">
-              <h3 className={`text-xl font-semibold text-[${THEME.colors.text.primary}] mb-4`}>Ready to Find Your Crew?</h3>
-              <p className={`text-[${THEME.colors.text.secondary}] mb-6`}>Create your vibe profile and get matched with compatible runners on Flow blockchain.</p>
-              <button 
-                onClick={() => router.push("/create-vibe-profile")}
-                className={`inline-flex items-center gap-2 ${THEME.styles.button} text-lg px-8 py-4`}
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                Create Vibe Profile
-              </button>
-            </div>
-          </CardContent>
         </Card>
 
         {/* Stats Grid */}
